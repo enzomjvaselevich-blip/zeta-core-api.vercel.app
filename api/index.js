@@ -670,14 +670,16 @@ return sendJson(404,{ok:false,error:'SIN_VIDEO',message:'El post no contiene un 
 }
 const candidatos=[data.descarga_directa,...(Array.isArray(data.candidatos)?data.candidatos:[])]
 .filter((u,i,a)=>typeof u==='string'&&/^https?:\/\//.test(u)&&a.indexOf(u)===i);
+// Enlaces de snapsave (rapidcdn): headers neutros, su CDN no exige ninguno.
+const headersDescarga=data.fuente==='snapsave'?{}:scrapeHeaders;
 for(const mediaUrl of candidatos){
 // Mismos headers exactos que los probes internos del scraping (sin Referer
 // extra): cualquier diferencia entre el probe y la descarga es una chance de
 // que el CDN de Meta cambie la respuesta.
-const probe=await probeMediaTipo(mediaUrl,scrapeHeaders);
+const probe=await probeMediaTipo(mediaUrl,headersDescarga);
 if(debugProbes)debugProbes.push({ronda,url:mediaUrl.slice(0,70),status:probe.status,tipo:probe.tipo});
 if(probe.ok){
-return streamMedia(req,res,sendJson,requestId,mediaUrl,{sinProxy:true,headers:scrapeHeaders,exigirVideo:true,mensajeBloqueo:'El CDN de '+(kind==='instagram'?'Instagram':'Facebook')+' rechazo la descarga desde este hosting (HTTP 403).'});
+return streamMedia(req,res,sendJson,requestId,mediaUrl,{sinProxy:true,headers:headersDescarga,exigirVideo:true,mensajeBloqueo:'El CDN de '+(kind==='instagram'?'Instagram':'Facebook')+' rechazo la descarga desde este hosting (HTTP 403).'});
 }
 }
 }
@@ -1217,6 +1219,11 @@ return sendJson(200,data);
 }catch(e){
 return sendJson(404,{ok:false,error:{message:String(e&&e.message||e).slice(0,220)}});
 }
+}
+if(pathname==='/gacha/tirar'){
+// Handler del gacha movido a lib/ para no superar el limite de 12 funciones
+// serverless del plan Hobby de Vercel.
+return require('../lib/gacha-tirar')(req,res);
 }
 if(pathname==='/status'){
 return sendJson(200,{ok:true,servicio:'ZETA-CORE API',secureApi_cargada:!secureApiLoadError,secureApi_error:secureApiLoadError?String(secureApiLoadError&&secureApiLoadError.message||secureApiLoadError).slice(0,300):undefined,youtube_cookie_configurada:!!(process.env.YOUTUBE_COOKIE||process.env.youtube_cookie),youtube_cookie_vigente:!!(process.env.YOUTUBE_COOKIE||process.env.youtube_cookie)&&secureApi.cookieManualVigente()!==false,youtube_visitor_data_configurada:!!(process.env.YOUTUBE_VISITOR_DATA||process.env.youtube_visitor_data),precalentamiento:(secureApi.estadoPrecalentamiento&&typeof secureApi.estadoPrecalentamiento==='function')?secureApi.estadoPrecalentamiento():null,sesion_anonima:(secureApi.estadoSesionAnonima?typeof secureApi.estadoSesionAnonima==='function'?secureApi.estadoSesionAnonima():{activa:false}:{activa:false}),dl_key_configurada:!!(process.env.DL_KEY||process.env.dl_key),capas_activas:['scraping_directo','potoken_botguard','savetube','y2down'],configuracion_dueno:'no requerida: la API auto-gestiona su sesion anonima y su PO token BotGuard en memoria',admin_password_configurada:!!(process.env.ADMIN_PASSWORD||process.env.admin_password),endpoints:['/ytmp4','/ytmp3','/ytsearch','/tiktok','/ttsearch','/xvideo','/instagram','/facebook','/dl','/status']});
